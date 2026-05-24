@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 from datetime import datetime
 import redis.asyncio as aioredis
@@ -9,17 +10,19 @@ from app.config import settings
 from app.db.models import InferenceLog, Conversation
 from app.lib.pii import redact
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
 STREAM = "inference:logs"
 GROUP = "workers"
 CONSUMER = "worker-1"
+MAX_RETRIES = 3
 
 engine = create_async_engine(settings.database_url)
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def process(data: dict):
-    # Small delay to let the chat endpoint finish inserting the assistant message
-    await asyncio.sleep(0.5)
     async with async_session() as session:
         log = InferenceLog(
             id=uuid.UUID(data[b"id"].decode()),
@@ -49,6 +52,28 @@ async def process(data: dict):
         await session.commit()
 
 
+async def handle_message(r, msg_id, data):
+    try:
+        await process(data)
+        await r.xack(STREAM, GROUP, msg_id)
+        logger.info("Processed %s", data[b"id"].decode())
+    except Exception as e:
+        logger.error("Failed to process %s: %s", msg_id.decode() if isinstance(msg_id, bytes) else msg_id, e)
+
+
+async def recover_pending(r):
+    """Retry messages that were delivered but never ACKed."""
+    pending = await r.xpending_range(STREAM, GROUP, min="-", max="+", count=50)
+    for entry in pending:
+        if entry["times_delivered"] > MAX_RETRIES:
+            logger.warning("Dead-lettering message %s after %d attempts", entry["message_id"], entry["times_delivered"])
+            await r.xack(STREAM, GROUP, entry["message_id"])
+            continue
+        messages = await r.xrange(STREAM, min=entry["message_id"], max=entry["message_id"])
+        for msg_id, data in messages:
+            await handle_message(r, msg_id, data)
+
+
 async def main():
     r = aioredis.from_url(settings.redis_url)
     try:
@@ -56,17 +81,19 @@ async def main():
     except Exception:
         pass
 
-    print(f"Worker listening on {STREAM}...")
+    logger.info("Worker listening on %s...", STREAM)
     while True:
+        # Recover any pending unACKed messages
+        try:
+            await recover_pending(r)
+        except Exception as e:
+            logger.error("Pending recovery error: %s", e)
+
+        # Read new messages
         messages = await r.xreadgroup(GROUP, CONSUMER, {STREAM: ">"}, count=10, block=2000)
         for stream, entries in messages:
             for msg_id, data in entries:
-                try:
-                    await process(data)
-                    await r.xack(STREAM, GROUP, msg_id)
-                    print(f"[OK] {data[b'id'].decode()}")
-                except Exception as e:
-                    print(f"[ERR] {e}")
+                await handle_message(r, msg_id, data)
 
 
 if __name__ == "__main__":

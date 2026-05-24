@@ -80,19 +80,26 @@ You're running on multiple models (Groq, Gemini) depending on what the user sele
         finally:
             content = "".join(full_response)
             if content:
-                assistant_msg = Message(
-                    id=uuid.UUID(assistant_message_id),
-                    conversation_id=uuid.UUID(conversation_id),
-                    role="assistant",
-                    content=content,
-                )
-                db.add(assistant_msg)
-                await db.execute(
-                    update(Conversation)
-                    .where(Conversation.id == uuid.UUID(conversation_id))
-                    .values(message_count=Conversation.message_count + 2)
-                )
-                await db.commit()
+                for attempt in range(3):
+                    try:
+                        assistant_msg = Message(
+                            id=uuid.UUID(assistant_message_id),
+                            conversation_id=uuid.UUID(conversation_id),
+                            role="assistant",
+                            content=content,
+                        )
+                        db.add(assistant_msg)
+                        await db.execute(
+                            update(Conversation)
+                            .where(Conversation.id == uuid.UUID(conversation_id))
+                            .values(message_count=Conversation.message_count + 2)
+                        )
+                        await db.commit()
+                        break
+                    except Exception as e:
+                        await db.rollback()
+                        if attempt == 2:
+                            logger.error("Failed to persist assistant message after 3 attempts. conversation=%s message=%s error=%s", conversation_id, assistant_message_id, str(e))
         yield f"data: {json.dumps({'done': True, 'conversation_id': conversation_id, 'message_id': assistant_message_id})}\n\n"
   
     return StreamingResponse(event_stream(), media_type="text/event-stream")
