@@ -4,6 +4,7 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  isError?: boolean
 }
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -50,6 +51,10 @@ export function useChat() {
           const data = JSON.parse(line.slice(6))
           if (data.done) {
             setConversationId(data.conversation_id)
+          } else if (data.error) {
+            setMessages(prev =>
+              prev.map(m => m.id === assistantId ? { ...m, content: data.error, isError: true } : m)
+            )
           } else if (data.chunk) {
             setMessages(prev =>
               prev.map(m => m.id === assistantId ? { ...m, content: m.content + data.chunk } : m)

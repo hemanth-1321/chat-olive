@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 from app.db.database import get_db
-from app.db.models import Conversation, Message
+from app.db.models import Conversation
 
 router = APIRouter()
 

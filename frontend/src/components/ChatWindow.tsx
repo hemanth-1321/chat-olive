@@ -45,14 +45,18 @@ export function ChatWindow({ conversationId, initialMessages, onConversationCrea
           )}
           {messages.map(m => (
             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] rounded-lg px-4 py-2.5 text-sm ${m.role === 'user' ? 'bg-zinc-700 text-zinc-100' : 'bg-card border border-border'}`}>
+              <div className={`max-w-[80%] rounded-lg px-4 py-2.5 text-sm ${m.role === 'user' ? 'bg-zinc-700 text-zinc-100' : m.isError ? 'bg-red-950/50 border border-red-800 text-red-200' : 'bg-card border border-border'}`}>
                 {m.role === 'assistant' ? (
-                  <div className="prose prose-sm prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                    <ReactMarkdown>{m.content}</ReactMarkdown>
-                    {isStreaming && m === messages.at(-1) && (
-                      <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse ml-1" />
-                    )}
-                  </div>
+                  m.isError ? (
+                    <span>{m.content}</span>
+                  ) : (
+                    <div className="prose prose-sm prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                      <ReactMarkdown>{m.content}</ReactMarkdown>
+                      {isStreaming && m === messages.at(-1) && (
+                        <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse ml-1" />
+                      )}
+                    </div>
+                  )
                 ) : (
                   <span className="whitespace-pre-wrap">{m.content}</span>
                 )}

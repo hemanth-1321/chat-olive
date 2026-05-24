@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends,Request
@@ -10,6 +11,8 @@ from app.db.database import get_db
 from app.db.models import Conversation, Message
 from app.sdk.llm_sdk import LLMWrapper
 from app.lib.pricing import MODELS
+
+logger = logging.getLogger(__name__)
 
 router=APIRouter()
 sdk=LLMWrapper()
@@ -65,10 +68,15 @@ You're running on multiple models (Groq, Gemini) depending on what the user sele
         full_response=[]
         try:
             async for chunk in sdk.chat_stream(messages=history,model=model,provider=provider,conversation_id=conversation_id,message_id=assistant_message_id):
-                full_response.append(chunk)
-                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-        except Exception:
-            pass
+                if chunk.startswith("[Error]:"):
+                    logger.error("LLM error for conversation=%s model=%s: %s", conversation_id, model, chunk)
+                    yield f"data: {json.dumps({'error': 'Something went wrong. Please try again later.'})}\n\n"
+                else:
+                    full_response.append(chunk)
+                    yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        except Exception as e:
+            logger.error("Stream exception for conversation=%s: %s", conversation_id, str(e))
+            yield f"data: {json.dumps({'error': 'Something went wrong. Please try again later.'})}\n\n"
         finally:
             content = "".join(full_response)
             if content:
