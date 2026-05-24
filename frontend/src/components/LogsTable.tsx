@@ -1,0 +1,96 @@
+import { useState, useEffect, useCallback } from 'react'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+
+interface LogEntry {
+  id: string
+  timestamp: string
+  model: string
+  status: string
+  latency_ms: number
+  tokens: number
+  cost_usd: number
+}
+
+const API = 'http://localhost:8000'
+
+export function LogsTable() {
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [model, setModel] = useState('')
+  const [status, setStatus] = useState('')
+
+  const fetchLogs = useCallback(async () => {
+    const params = new URLSearchParams({ limit: '100', offset: '0' })
+    if (model) params.set('model', model)
+    if (status) params.set('status', status)
+    try {
+      const res = await fetch(`${API}/api/logs/?${params}`)
+      setLogs(await res.json())
+    } catch (e) { console.error(e) }
+  }, [model, status])
+
+  useEffect(() => { fetchLogs() }, [fetchLogs])
+
+  return (
+    <div className="p-6 space-y-4 max-w-6xl mx-auto">
+      <div className="flex items-center gap-3">
+        <h2 className="text-lg font-semibold flex-1">Inference Logs</h2>
+        <Select value={model} onValueChange={v => setModel(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="All models" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All models</SelectItem>
+            <SelectItem value="anthropic/claude-sonnet-4-5">Claude Sonnet</SelectItem>
+            <SelectItem value="openai/gpt-4.1">GPT-4.1</SelectItem>
+            <SelectItem value="google/gemini-2.0-flash-exp:free">Gemini Flash</SelectItem>
+            <SelectItem value="deepseek/deepseek-chat">DeepSeek</SelectItem>
+            <SelectItem value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3</SelectItem>
+            <SelectItem value="mistralai/mistral-7b-instruct:free">Mistral 7B</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={status} onValueChange={v => setStatus(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-[130px]"><SelectValue placeholder="All status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All status</SelectItem>
+            <SelectItem value="success">Success</SelectItem>
+            <SelectItem value="error">Error</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="border border-border rounded-md overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Timestamp</TableHead>
+              <TableHead>Model</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Latency</TableHead>
+              <TableHead className="text-right">Tokens</TableHead>
+              <TableHead className="text-right">Cost</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {logs.map(log => (
+              <TableRow key={log.id}>
+                <TableCell className="text-xs text-muted-foreground">{new Date(log.timestamp).toLocaleString()}</TableCell>
+                <TableCell className="text-xs">{log.model?.split('/').pop()}</TableCell>
+                <TableCell>
+                  <Badge variant={log.status === 'success' ? 'secondary' : 'destructive'} className="text-[10px]">
+                    {log.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right text-xs">{log.latency_ms}ms</TableCell>
+                <TableCell className="text-right text-xs">{log.tokens}</TableCell>
+                <TableCell className="text-right text-xs">${log.cost_usd?.toFixed(5)}</TableCell>
+              </TableRow>
+            ))}
+            {logs.length === 0 && (
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No logs found</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )
+}
