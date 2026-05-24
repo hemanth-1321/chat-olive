@@ -31,7 +31,11 @@ export function LogsTable() {
     } catch (e) { console.error(e) }
   }, [model, status])
 
-  useEffect(() => { fetchLogs() }, [fetchLogs])
+  useEffect(() => {
+    void (async () => {
+      await fetchLogs()
+    })()
+  }, [fetchLogs])
 
   return (
     <div className="p-6 space-y-4 max-w-6xl mx-auto">

@@ -26,7 +26,11 @@ export function useConversations() {
     }
   }, [])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => {
+    void (async () => {
+      await refresh()
+    })()
+  }, [refresh])
 
   const cancelConversation = useCallback(async (id: string) => {
     await fetch(`${API}/api/conversations/${id}/cancel`, { method: 'PATCH' })
