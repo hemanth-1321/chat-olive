@@ -87,7 +87,7 @@ sequenceDiagram
 |-------|-----------|
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui |
 | Backend | FastAPI, SQLAlchemy 2.0 (async), Pydantic |
-| LLM Providers | Groq, Google Gemini (OpenAI-compatible) |
+| LLM Providers | Groq (Llama 3.3, Llama 4 Scout), Google Gemini (2.0 Flash, 2.5 Flash) |
 | Event Bus | Redis Streams |
 | Database | PostgreSQL 16 |
 | Migrations | Alembic |
@@ -103,14 +103,30 @@ sequenceDiagram
 - Docker (for Postgres + Redis)
 - API keys: [Groq](https://console.groq.com), [Google AI Studio](https://aistudio.google.com/apikey)
 
-### 1. Clone
+### Quick Start
+
+```bash
+git clone https://github.com/hemanth-1321/chat-olive.git
+cd chat-olive
+chmod +x setup.sh
+./setup.sh
+```
+
+This installs all dependencies, starts Docker services, and runs migrations. After it completes, fill in your API keys in `backend/.env` and start the services (see below).
+
+### Manual Setup
+
+<details>
+<summary>Step-by-step instructions</summary>
+
+#### 1. Clone
 
 ```bash
 git clone https://github.com/your-username/ollive-platform.git
 cd ollive-platform
 ```
 
-### 2. Start Infrastructure
+#### 2. Start Infrastructure
 
 ```bash
 docker compose up -d
@@ -161,6 +177,8 @@ GEMINI_API_KEY=AIza...
 ```
 VITE_API_URL=http://localhost:8000
 ```
+
+</details>
 
 ---
 
