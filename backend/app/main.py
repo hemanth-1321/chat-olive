@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import chat,conversation, logs,metrics
+from app.api import chat, conversation, logs, metrics
+from app.lib.pricing import MODELS
 
 @asynccontextmanager
 async def lifespan(app:FastAPI):
@@ -21,4 +22,8 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(conversation.router, prefix="/api/conversations", tags=["conversations"])
 app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
+
+@app.get("/api/models")
+async def list_models():
+    return [{"id": k, "provider": v.provider} for k, v in MODELS.items()]
   

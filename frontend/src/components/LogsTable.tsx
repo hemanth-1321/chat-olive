@@ -9,11 +9,12 @@ interface LogEntry {
   model: string
   status: string
   latency_ms: number
-  tokens: number
-  cost_usd: number
+  ttft_ms: number | null
+  total_tokens: number
+  estimated_cost_usd: number
 }
 
-const API = 'http://localhost:8000'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export function LogsTable() {
   const [logs, setLogs] = useState<LogEntry[]>([])
@@ -40,12 +41,11 @@ export function LogsTable() {
           <SelectTrigger className="w-[180px]"><SelectValue placeholder="All models" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All models</SelectItem>
-            <SelectItem value="anthropic/claude-sonnet-4-5">Claude Sonnet</SelectItem>
-            <SelectItem value="openai/gpt-4.1">GPT-4.1</SelectItem>
-            <SelectItem value="google/gemini-2.0-flash-exp:free">Gemini Flash</SelectItem>
-            <SelectItem value="deepseek/deepseek-chat">DeepSeek</SelectItem>
-            <SelectItem value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3</SelectItem>
-            <SelectItem value="mistralai/mistral-7b-instruct:free">Mistral 7B</SelectItem>
+            <SelectItem value="llama-3.3-70b-versatile">Llama 3.3 70B</SelectItem>
+            <SelectItem value="llama-3.1-8b-instant">Llama 3.1 8B</SelectItem>
+            <SelectItem value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout</SelectItem>
+            <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+            <SelectItem value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash</SelectItem>
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={v => setStatus(v === 'all' ? '' : v)}>
@@ -66,6 +66,7 @@ export function LogsTable() {
               <TableHead>Model</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Latency</TableHead>
+              <TableHead className="text-right">TTFT</TableHead>
               <TableHead className="text-right">Tokens</TableHead>
               <TableHead className="text-right">Cost</TableHead>
             </TableRow>
@@ -80,13 +81,14 @@ export function LogsTable() {
                     {log.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right text-xs">{log.latency_ms}ms</TableCell>
-                <TableCell className="text-right text-xs">{log.tokens}</TableCell>
-                <TableCell className="text-right text-xs">${log.cost_usd?.toFixed(5)}</TableCell>
+                <TableCell className="text-right text-xs">{Math.round(log.latency_ms)}ms</TableCell>
+                <TableCell className="text-right text-xs">{log.ttft_ms ? `${Math.round(log.ttft_ms)}ms` : '—'}</TableCell>
+                <TableCell className="text-right text-xs">{log.total_tokens}</TableCell>
+                <TableCell className="text-right text-xs">${log.estimated_cost_usd?.toFixed(5)}</TableCell>
               </TableRow>
             ))}
             {logs.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No logs found</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No logs found</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

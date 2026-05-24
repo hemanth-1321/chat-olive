@@ -1,7 +1,6 @@
 import { Plus, X, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Conversation } from '@/hooks/useConversations'
 
 interface SidebarProps {
@@ -19,15 +18,15 @@ export function Sidebar({ conversations, selectedId, onSelect, onNew, onCancel, 
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />}
-      <aside className={`fixed md:static z-50 top-0 left-0 h-full w-[280px] bg-card border-r border-border flex flex-col transition-transform duration-150 ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="p-4 flex items-center justify-between border-b border-border">
+      <aside className={`fixed md:static z-50 top-0 left-0 h-full w-[280px] bg-card border-r border-border flex flex-col overflow-hidden transition-transform duration-150 ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="shrink-0 h-[55px] px-4 flex items-center justify-between border-b border-border">
           <h2 className="font-semibold text-sm">Conversations</h2>
           <div className="flex gap-1">
             <Button size="icon" variant="ghost" onClick={onNew}><Plus className="w-4 h-4" /></Button>
             <Button size="icon" variant="ghost" className="md:hidden" onClick={onClose}><X className="w-4 h-4" /></Button>
           </div>
         </div>
-        <ScrollArea className="flex-1">
+        <div className="flex-1 overflow-y-auto">
           <div className="p-2 space-y-1">
             {conversations.map(c => (
               <div
@@ -53,7 +52,7 @@ export function Sidebar({ conversations, selectedId, onSelect, onNew, onCancel, 
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </aside>
     </>
   )

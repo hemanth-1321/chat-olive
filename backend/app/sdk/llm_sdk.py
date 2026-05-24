@@ -8,15 +8,22 @@ import httpx
 import redis.asyncio as aioredis
 
 from app.config import settings
-from app.lib.pricing import get_cost
+from app.lib.pricing import MODELS, get_cost
 from app.lib.pii import redact
-
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 class LLMWrapper:
     def __init__(self):
         self.redis_client = aioredis.from_url(settings.redis_url)
+
+    def _get_config(self, model: str):
+        cfg = MODELS.get(model)
+        if not cfg:
+            raise ValueError(f"Unknown model: {model}. Available: {list(MODELS.keys())}")
+        api_key = getattr(settings, cfg.api_key_name)
+        if not api_key:
+            raise ValueError(f"Missing API key: {cfg.api_key_name}")
+        return cfg, api_key
 
     async def chat_stream(self, messages: list[dict], model: str, provider: str, conversation_id: str, message_id: str) -> AsyncGenerator[str, None]:
         start = time.perf_counter()
@@ -29,50 +36,63 @@ class LLMWrapper:
         request_id = ""
         output_chunks: list[str] = []
 
-        headers = {
-            "Authorization": f"Bearer {settings.openrouter_api_key}",
-            "Content-Type": "application/json",
-        }
-
-        payload = {
-            "model": model,
-            "messages": messages,
-            "stream": True,
-            "stream_options": {"include_usage": True},
-        }
-
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                async with client.stream("POST", OPENROUTER_URL, headers=headers, json=payload) as response:
-                    request_id = response.headers.get("X-Request-ID", "")
-                    if response.status_code != 200:
-                        body = await response.aread()
-                        error_message = body.decode()[:200]
-                        status = "error"
-                        yield f"[Error]: {error_message}"
-                    else:
-                        async for line in response.aiter_lines():
-                            if not line.startswith("data: "):
-                                continue
-                            data = line[6:]
-                            if data == "[DONE]":
-                                break
-                            chunk = json.loads(data)
-                            if chunk.get("usage"):
-                                prompt_tokens = chunk["usage"].get("prompt_tokens", 0)
-                                completion_tokens = chunk["usage"].get("completion_tokens", 0)
-                                total_tokens = prompt_tokens + completion_tokens
-                            delta = chunk.get("choices", [{}])[0].get("delta", {})
-                            content = delta.get("content")
-                            if content:
-                                if ttft is None:
-                                    ttft = (time.perf_counter() - start) * 1000
-                                output_chunks.append(content)
-                                yield content
-        except Exception as e:
+            cfg, api_key = self._get_config(model)
+        except ValueError as e:
+            yield f"[Error]: {e}"
             status = "error"
             error_message = str(e)
-            yield f"[Error]: {error_message}"
+            # still publish event below
+            cfg = None
+            api_key = None
+
+        if cfg and api_key:
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+
+            payload = {
+                "model": model,
+                "messages": messages,
+                "stream": True,
+            }
+
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    async with client.stream("POST", cfg.base_url, headers=headers, json=payload) as response:
+                        request_id = response.headers.get("X-Request-ID", "") or response.headers.get("x-request-id", "")
+                        if response.status_code != 200:
+                            body = await response.aread()
+                            error_message = body.decode()[:200]
+                            status = "error"
+                            yield f"[Error]: {error_message}"
+                        else:
+                            async for line in response.aiter_lines():
+                                if not line.startswith("data: "):
+                                    continue
+                                data = line[6:]
+                                if data == "[DONE]":
+                                    break
+                                chunk = json.loads(data)
+                                if chunk.get("usage"):
+                                    prompt_tokens = chunk["usage"].get("prompt_tokens", 0)
+                                    completion_tokens = chunk["usage"].get("completion_tokens", 0)
+                                    total_tokens = prompt_tokens + completion_tokens
+                                choices = chunk.get("choices", [])
+                                if not choices:
+                                    continue
+                                delta = choices[0].get("delta", {})
+                                content = delta.get("content")
+                                if content:
+                                    if ttft is None:
+                                        ttft = (time.perf_counter() - start) * 1000
+                                    output_chunks.append(content)
+                                    yield content
+            except Exception as e:
+                status = "error"
+                error_message = str(e)
+                yield f"[Error]: {error_message}"
 
         latency_ms = (time.perf_counter() - start) * 1000
         input_preview = redact(messages[-1]["content"][:200]) if messages else ""

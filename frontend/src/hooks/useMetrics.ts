@@ -18,7 +18,7 @@ export interface ThroughputPoint {
   tokens: number
 }
 
-const API = 'http://localhost:8000'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export function useMetrics() {
   const [overview, setOverview] = useState<MetricsOverview | null>(null)

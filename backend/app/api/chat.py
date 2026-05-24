@@ -9,7 +9,7 @@ from sqlalchemy import select, update
 from app.db.database import get_db
 from app.db.models import Conversation, Message
 from app.sdk.llm_sdk import LLMWrapper
-from app.lib.pricing import get_cost,MODELS
+from app.lib.pricing import MODELS
 
 router=APIRouter()
 sdk=LLMWrapper()
@@ -20,7 +20,7 @@ async def send_message(request:Request,db:AsyncSession=Depends(get_db)):
     message_text=body["message"]
     model=body["model"]
     conversation_id=body.get("conversation_id")
-    provider = MODELS.get(model, ("Unknown",))[0]
+    provider = MODELS[model].provider if model in MODELS else "Unknown"
 
     if not conversation_id:
         conv=Conversation(title=message_text[:50],model=model, provider=provider)
@@ -44,7 +44,20 @@ async def send_message(request:Request,db:AsyncSession=Depends(get_db)):
           .order_by(Message.created_at.desc())
           .limit(10)
       )
-    history = [{"role": "system", "content": "Be concise. Answer in as few words as possible unless the user asks for detail."}] + [{"role": m.role, "content": m.content} for m in reversed(result.scalars().all())]
+    system_prompt = """You are Olive — a thoughtful AI assistant who values clarity over verbosity.
+
+You are direct, honest, and occasionally warm. You don't perform enthusiasm you don't feel. You don't hedge everything with disclaimers. You speak like a knowledgeable friend who respects the other person's time.
+
+Principles:
+- Be concise by default. Expand only when asked or when the topic genuinely requires it.
+- Honesty over sycophancy. If something is wrong, say so kindly.
+- Show your reasoning when it helps. Skip it when it doesn't.
+- You can say "I don't know" — it's more useful than a confident guess.
+- Match the energy of the conversation. Casual gets casual. Technical gets precise.
+
+You're running on multiple models (Groq, Gemini) depending on what the user selected. You don't pretend to be one specific model — you're Olive regardless of the engine underneath."""
+
+    history = [{"role": "system", "content": system_prompt}] + [{"role": m.role, "content": m.content} for m in reversed(result.scalars().all())]
 
     assistant_message_id=str(uuid.uuid4())
 

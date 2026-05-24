@@ -9,7 +9,7 @@ export function Dashboard() {
 
   const cards = [
     { label: 'Total Requests', value: overview.total_requests.toLocaleString() },
-    { label: 'Error Rate', value: `${(overview.error_rate * 100).toFixed(1)}%` },
+    { label: 'Error Rate', value: `${overview.error_rate.toFixed(1)}%` },
     { label: 'Avg Latency', value: `${overview.avg_latency_ms.toFixed(0)}ms` },
     { label: 'P95 Latency', value: `${overview.p95_latency_ms.toFixed(0)}ms` },
     { label: 'Total Tokens', value: overview.total_tokens.toLocaleString() },

@@ -9,7 +9,7 @@ export interface Conversation {
   messages?: { role: string; content: string }[]
 }
 
-const API = 'http://localhost:8000'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([])
