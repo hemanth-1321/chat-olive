@@ -63,9 +63,32 @@ You're running on multiple models (Groq) depending on what the user selected. Yo
     history = [{"role": "system", "content": system_prompt}] + [{"role": m.role, "content": m.content} for m in reversed(result.scalars().all())]
 
     assistant_message_id=str(uuid.uuid4())
+    full_response: list[str] = []
+
+    async def save_message():
+        content = "".join(full_response)
+        if not content:
+            return
+        try:
+            assistant_msg = Message(
+                id=uuid.UUID(assistant_message_id),
+                conversation_id=uuid.UUID(conversation_id),
+                role="assistant",
+                content=content,
+            )
+            db.add(assistant_msg)
+            await db.execute(
+                update(Conversation)
+                .where(Conversation.id == uuid.UUID(conversation_id))
+                .values(message_count=Conversation.message_count + 2)
+            )
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            logger.error("Failed to persist assistant message. conversation=%s error=%s", conversation_id, str(e))
 
     async def event_stream():
-        full_response=[]
+        yield f"data: {json.dumps({'conversation_id': conversation_id, 'message_id': assistant_message_id})}\n\n"
         try:
             async for chunk in sdk.chat_stream(messages=history,model=model,provider=provider,conversation_id=conversation_id,message_id=assistant_message_id):
                 if chunk.startswith("[Error]:"):
@@ -78,29 +101,29 @@ You're running on multiple models (Groq) depending on what the user selected. Yo
             logger.error("Stream exception for conversation=%s: %s", conversation_id, str(e))
             yield f"data: {json.dumps({'error': 'Something went wrong. Please try again later.'})}\n\n"
         finally:
-            content = "".join(full_response)
-            if content:
-                for attempt in range(3):
-                    try:
-                        assistant_msg = Message(
-                            id=uuid.UUID(assistant_message_id),
-                            conversation_id=uuid.UUID(conversation_id),
-                            role="assistant",
-                            content=content,
-                        )
-                        db.add(assistant_msg)
-                        await db.execute(
-                            update(Conversation)
-                            .where(Conversation.id == uuid.UUID(conversation_id))
-                            .values(message_count=Conversation.message_count + 2)
-                        )
-                        await db.commit()
-                        break
-                    except Exception as e:
-                        await db.rollback()
-                        if attempt == 2:
-                            logger.error("Failed to persist assistant message after 3 attempts. conversation=%s message=%s error=%s", conversation_id, assistant_message_id, str(e))
+            await save_message()
         yield f"data: {json.dumps({'done': True, 'conversation_id': conversation_id, 'message_id': assistant_message_id})}\n\n"
   
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/save")
+async def save_partial(request: Request, db: AsyncSession = Depends(get_db)):
+    body = await request.json()
+    conversation_id = body.get("conversation_id")
+    message_id = body.get("message_id")
+    content = body.get("content", "")
+    if not conversation_id or not content:
+        return {"ok": False}
+    try:
+        existing = await db.execute(select(Message).where(Message.id == uuid.UUID(message_id)))
+        if existing.scalar_one_or_none():
+            return {"ok": True}
+        msg = Message(id=uuid.UUID(message_id), conversation_id=uuid.UUID(conversation_id), role="assistant", content=content)
+        db.add(msg)
+        await db.execute(update(Conversation).where(Conversation.id == uuid.UUID(conversation_id)).values(message_count=Conversation.message_count + 2))
+        await db.commit()
+    except Exception:
+        await db.rollback()
+    return {"ok": True}
   

@@ -13,7 +13,10 @@ import type { Message } from '@/hooks/useChat'
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [dark, setDark] = useState(true)
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem('ollive_theme')
+    return saved ? saved === 'dark' : true
+  })
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [initialMessages, setInitialMessages] = useState<Message[]>([])
   const [onboarded, setOnboarded] = useState(() => !!getUsername())
@@ -21,6 +24,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
+    localStorage.setItem('ollive_theme', dark ? 'dark' : 'light')
   }, [dark])
 
   const handleSelect = async (id: string) => {
