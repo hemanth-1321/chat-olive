@@ -231,7 +231,7 @@ erDiagram
 
 ### Design Decisions
 
-- **`session_id` on conversations** — cookie-based anonymous isolation; each browser session only sees its own conversations
+- **`session_id` on conversations** — header-based anonymous isolation; each browser stores a UUID in localStorage and sends it via `x-session-id` header, so each user only sees their own conversations
 - **`inference_logs.message_id` uses `ON DELETE SET NULL`** — logs persist even if conversation is deleted (audit trail)
 - **`total_tokens` denormalized on conversations** — avoids expensive SUM queries for dashboard
 - **PII redaction on previews only** — full message content stored unredacted in `messages` table for conversation continuity
@@ -321,7 +321,7 @@ Zero-downtime: `up --build` rebuilds images then swaps containers — old contai
 ## What I'd Improve With More Time
 
 1. **Guaranteed log delivery** — in-process buffer with retry if Redis is down
-2. **Auth** — JWT for users, API keys for SDK consumers (currently uses anonymous session cookies)
+2. **Auth** — JWT for users, API keys for SDK consumers (currently uses anonymous session via localStorage)
 3. **Streaming cancellation** — propagate cancel upstream to provider (save tokens)
 4. **OpenTelemetry** — distributed tracing across API + worker
 5. **Test suite** — pytest + httpx AsyncClient for API, mock Redis for worker
@@ -340,7 +340,7 @@ Zero-downtime: `up --build` rebuilds images then swaps containers — old contai
 │   │   ├── api/
 │   │   │   ├── chat.py          # SSE streaming endpoint
 │   │   │   ├── conversation.py  # CRUD (session-scoped)
-│   │   │   ├── session.py       # Cookie-based session isolation
+│   │   │   ├── session.py       # Header-based session isolation
 │   │   │   ├── metrics.py       # Dashboard queries
 │   │   │   └── logs.py          # Inference logs
 │   │   ├── sdk/

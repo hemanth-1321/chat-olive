@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
+import { getSessionId } from '@/lib/session'
 
 export interface Message {
   id: string
@@ -29,8 +30,7 @@ export function useChat() {
     try {
       const res = await fetch(`${API}/api/chat/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'x-session-id': getSessionId() },
         body: JSON.stringify({ message, model, conversation_id: conversationId }),
         signal: controller.signal,
       })

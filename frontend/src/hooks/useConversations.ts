@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getSessionId } from '@/lib/session'
 
 export interface Conversation {
   id: string
@@ -17,7 +18,7 @@ export function useConversations() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/conversations/`, { credentials: 'include' })
+      const res = await fetch(`${API}/api/conversations/`, { headers: { 'x-session-id': getSessionId() } })
       setConversations(await res.json())
     } catch (e) {
       console.error(e)
@@ -33,18 +34,18 @@ export function useConversations() {
   }, [refresh])
 
   const cancelConversation = useCallback(async (id: string) => {
-    await fetch(`${API}/api/conversations/${id}/cancel`, { method: 'PATCH', credentials: 'include' })
+    await fetch(`${API}/api/conversations/${id}/cancel`, { method: 'PATCH', headers: { 'x-session-id': getSessionId() } })
     refresh()
   }, [refresh])
 
   const deleteConversation = useCallback(async (id: string) => {
-    await fetch(`${API}/api/conversations/${id}`, { method: 'DELETE', credentials: 'include' })
+    await fetch(`${API}/api/conversations/${id}`, { method: 'DELETE', headers: { 'x-session-id': getSessionId() } })
     refresh()
   }, [refresh])
 
   const getConversation = useCallback(async (id: string): Promise<Conversation | null> => {
     try {
-      const res = await fetch(`${API}/api/conversations/${id}`, { credentials: 'include' })
+      const res = await fetch(`${API}/api/conversations/${id}`, { headers: { 'x-session-id': getSessionId() } })
       return await res.json()
     } catch { return null }
   }, [])
