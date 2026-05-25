@@ -129,11 +129,20 @@
     }
 }
 
-@keyframes fade-in-tokens {
-  from { opacity: 0.4; }
-  to { opacity: 1; }
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
-.animate-fade-in-tokens > * {
-  animation: fade-in-tokens 0.3s ease-out forwards;
+.animate-blink {
+  animation: blink 0.8s step-end infinite;
+}
+
+.streaming-text > *:last-child {
+  animation: fade-in 0.15s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0.4; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
 }
