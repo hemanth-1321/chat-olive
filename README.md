@@ -1,10 +1,11 @@
 # Ollive — LLM Inference Logging & Observability Platform
 
-A full-stack platform for chatting with multiple LLM providers while capturing inference telemetry in real time.
+A full-stack platform for chatting with multiple LLM models while capturing inference telemetry in real time.
 
 ![Chat](https://img.shields.io/badge/Chat-SSE_Streaming-blue)
-![Providers](https://img.shields.io/badge/Providers-Groq_|_Gemini-green)
+![Providers](https://img.shields.io/badge/Providers-Groq-green)
 ![Architecture](https://img.shields.io/badge/Architecture-Event_Driven-purple)
+![Deploy](https://img.shields.io/badge/Deploy-GitHub_Actions-orange)
 
 ---
 
@@ -23,7 +24,6 @@ graph TB
 
     subgraph Providers["LLM Providers"]
         Groq[Groq API]
-        Gemini[Google Gemini API]
     end
 
     subgraph Pipeline["Event Pipeline"]
@@ -38,7 +38,6 @@ graph TB
     UI -->|REST + SSE| API
     API --> SDK
     SDK -->|Stream| Groq
-    SDK -->|Stream| Gemini
     SDK -->|XADD| Redis
     Redis -->|XREADGROUP| Worker
     Worker -->|INSERT| DB
@@ -53,7 +52,7 @@ sequenceDiagram
     participant Frontend
     participant FastAPI
     participant SDK
-    participant LLM
+    participant Groq
     participant Redis
     participant Worker
     participant Postgres
@@ -62,12 +61,12 @@ sequenceDiagram
     Frontend->>FastAPI: POST /api/chat/send (SSE)
     FastAPI->>Postgres: INSERT user message
     FastAPI->>SDK: chat_stream(messages, model)
-    SDK->>LLM: POST /chat/completions (stream)
+    SDK->>Groq: POST /chat/completions (stream)
     loop Token streaming
-        LLM-->>SDK: chunk
+        Groq-->>SDK: chunk
         SDK-->>FastAPI: yield chunk
         FastAPI-->>Frontend: SSE data: {chunk}
-        Frontend-->>User: Render token
+        Frontend-->>User: Render token (animated)
     end
     SDK->>Redis: XADD inference:logs (fire & forget)
     FastAPI->>Postgres: INSERT assistant message
@@ -87,10 +86,12 @@ sequenceDiagram
 |-------|-----------|
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui |
 | Backend | FastAPI, SQLAlchemy 2.0 (async), Pydantic |
-| LLM Providers | Groq (Llama 3.3, Llama 4 Scout), Google Gemini (2.0 Flash, 2.5 Flash) |
+| LLM Providers | Groq (dynamic model discovery via API) |
+| Pricing | LiteLLM community pricing JSON (cached 24h) |
 | Event Bus | Redis Streams |
 | Database | PostgreSQL 16 |
 | Migrations | Alembic |
+| CI/CD | GitHub Actions → SSH deploy to DigitalOcean |
 
 ---
 
@@ -101,7 +102,7 @@ sequenceDiagram
 - Python 3.11+
 - Node.js 18+ / Bun
 - Docker (for Postgres + Redis)
-- API keys: [Groq](https://console.groq.com), [Google AI Studio](https://aistudio.google.com/apikey)
+- API key: [Groq](https://console.groq.com)
 
 ### Quick Start
 
@@ -112,7 +113,7 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-This installs all dependencies, starts Docker services, and runs migrations. After it completes, fill in your API keys in `backend/.env` and start the services (see below).
+This installs all dependencies, starts Docker services, and runs migrations. After it completes, fill in your API key in `backend/.env` and start the services (see below).
 
 ### Manual Setup
 
@@ -122,8 +123,8 @@ This installs all dependencies, starts Docker services, and runs migrations. Aft
 #### 1. Clone
 
 ```bash
-git clone https://github.com/your-username/ollive-platform.git
-cd ollive-platform
+git clone https://github.com/hemanth-1321/chat-olive.git
+cd chat-olive
 ```
 
 #### 2. Start Infrastructure
@@ -139,7 +140,7 @@ This starts PostgreSQL and Redis.
 ```bash
 cd backend
 cp .env.example .env
-# Fill in your API keys in .env
+# Fill in your Groq API key in .env
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8000
@@ -170,7 +171,6 @@ Open http://localhost:5173
 DATABASE_URL=postgresql+asyncpg://ollive:ollive@localhost:5432/ollive
 REDIS_URL=redis://localhost:6379
 GROQ_API_KEY=gsk_...
-GEMINI_API_KEY=AIza...
 ```
 
 **Frontend** (`frontend/.env`):
@@ -188,6 +188,7 @@ VITE_API_URL=http://localhost:8000
 erDiagram
     conversations {
         uuid id PK
+        text session_id "anonymous user isolation"
         text title
         text model
         text provider
@@ -230,10 +231,11 @@ erDiagram
 
 ### Design Decisions
 
+- **`session_id` on conversations** — cookie-based anonymous isolation; each browser session only sees its own conversations
 - **`inference_logs.message_id` uses `ON DELETE SET NULL`** — logs persist even if conversation is deleted (audit trail)
 - **`total_tokens` denormalized on conversations** — avoids expensive SUM queries for dashboard
 - **PII redaction on previews only** — full message content stored unredacted in `messages` table for conversation continuity
-- **Indexes on `timestamp DESC` + `model`** — optimized for dashboard group-by queries
+- **Indexes on `timestamp DESC` + `model` + `session_id`** — optimized for dashboard and per-user queries
 
 ---
 
@@ -242,8 +244,8 @@ erDiagram
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/chat/send` | SSE streaming chat |
-| GET | `/api/models` | List available models |
-| GET | `/api/conversations/` | List conversations |
+| GET | `/api/models` | List available models (fetched from Groq API) |
+| GET | `/api/conversations/` | List conversations (scoped to session) |
 | GET | `/api/conversations/:id` | Get conversation + messages |
 | PATCH | `/api/conversations/:id/cancel` | Cancel conversation |
 | DELETE | `/api/conversations/:id` | Delete conversation |
@@ -253,21 +255,13 @@ erDiagram
 
 ---
 
-## Multi-Provider SDK
+## Dynamic Model Discovery
 
-Adding a new model requires **one entry** in `backend/app/lib/pricing.py`:
+Models are fetched directly from the Groq API at runtime — no hardcoded model list. Non-text models (whisper, TTS, guard models) are filtered out automatically.
 
-```python
-"new-model-id": ModelConfig(
-    provider="ProviderName",
-    base_url="https://api.provider.com/v1/chat/completions",
-    api_key_name="provider_api_key",
-    prompt_cost_per_m=0.0,
-    completion_cost_per_m=0.0,
-),
-```
+Pricing is pulled from [LiteLLM's community-maintained JSON](https://github.com/BerriAI/litellm) and cached for 24 hours. Models without pricing data still work — they just show $0.00 cost.
 
-Then add the key to `config.py` Settings class and `.env`. The frontend auto-discovers models via `/api/models`.
+The frontend auto-discovers available models via `GET /api/models`.
 
 ---
 
@@ -281,6 +275,22 @@ SDK → XADD "inference:logs" → Redis Stream → XREADGROUP → Worker → Pos
 - **At-least-once delivery**: Worker only ACKs after successful DB write. If it crashes, Redis redelivers
 - **PII redaction**: Applied twice (SDK + Worker) as defense in depth
 - **Backpressure**: Stream capped at 10,000 entries via `MAXLEN`
+
+---
+
+## CI/CD
+
+On push to `main`, GitHub Actions SSHs into the DigitalOcean droplet and deploys:
+
+```yaml
+script: |
+  cd /root/chat-olive
+  git pull origin main
+  docker compose -f docker-compose.prod.yml up -d --build
+  docker image prune -f
+```
+
+Zero-downtime: `up --build` rebuilds images then swaps containers — old container serves traffic until the new one is ready.
 
 ---
 
@@ -311,13 +321,12 @@ SDK → XADD "inference:logs" → Redis Stream → XREADGROUP → Worker → Pos
 ## What I'd Improve With More Time
 
 1. **Guaranteed log delivery** — in-process buffer with retry if Redis is down
-2. **Auth** — JWT for users, API keys for SDK consumers
+2. **Auth** — JWT for users, API keys for SDK consumers (currently uses anonymous session cookies)
 3. **Streaming cancellation** — propagate cancel upstream to provider (save tokens)
-4. **Live pricing** — pull from provider APIs instead of hardcoding
-5. **OpenTelemetry** — distributed tracing across API + worker
-6. **Test suite** — pytest + httpx AsyncClient for API, mock Redis for worker
-7. **k8s manifests** — HPA on worker, readiness probes
-8. **Richer PII** — Microsoft Presidio (NER-based) instead of regex
+4. **OpenTelemetry** — distributed tracing across API + worker
+5. **Test suite** — pytest + httpx AsyncClient for API, mock Redis for worker
+6. **k8s manifests** — HPA on worker, readiness probes
+7. **Richer PII** — Microsoft Presidio (NER-based) instead of regex
 
 ---
 
@@ -330,27 +339,29 @@ SDK → XADD "inference:logs" → Redis Stream → XREADGROUP → Worker → Pos
 │   │   ├── config.py            # pydantic-settings
 │   │   ├── api/
 │   │   │   ├── chat.py          # SSE streaming endpoint
-│   │   │   ├── conversation.py  # CRUD
+│   │   │   ├── conversation.py  # CRUD (session-scoped)
+│   │   │   ├── session.py       # Cookie-based session isolation
 │   │   │   ├── metrics.py       # Dashboard queries
 │   │   │   └── logs.py          # Inference logs
 │   │   ├── sdk/
-│   │   │   └── llm_sdk.py       # Multi-provider wrapper
+│   │   │   └── llm_sdk.py       # Groq streaming wrapper
 │   │   ├── worker/
 │   │   │   └── consumer.py      # Redis stream consumer
 │   │   ├── db/
 │   │   │   ├── database.py      # Async engine
 │   │   │   └── models.py        # SQLAlchemy ORM
 │   │   └── lib/
-│   │       ├── pricing.py       # Model registry
+│   │       ├── pricing.py       # Dynamic model discovery + LiteLLM pricing
 │   │       └── pii.py           # Regex PII redaction
 │   ├── alembic/                  # Migrations
-│   ├── pyproject.toml
-│   └── .env
+│   ├── Dockerfile
+│   └── pyproject.toml
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx
 │   │   ├── components/
 │   │   │   ├── ChatWindow.tsx
+│   │   │   ├── StreamingMessage.tsx  # Animated token rendering
 │   │   │   ├── Sidebar.tsx
 │   │   │   ├── ModelPicker.tsx
 │   │   │   ├── Dashboard.tsx
@@ -361,7 +372,11 @@ SDK → XADD "inference:logs" → Redis Stream → XREADGROUP → Worker → Pos
 │   │       └── useMetrics.ts
 │   ├── package.json
 │   └── .env
-└── docker-compose.yml
+├── .github/workflows/
+│   ├── ci.yml                    # Lint + type check
+│   └── deploy.yml                # Auto-deploy to DigitalOcean
+├── docker-compose.yml            # Local dev (Postgres + Redis)
+└── docker-compose.prod.yml       # Production (backend + worker)
 ```
 
 ---

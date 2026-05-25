@@ -30,6 +30,7 @@ export function useChat() {
       const res = await fetch(`${API}/api/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ message, model, conversation_id: conversationId }),
         signal: controller.signal,
       })

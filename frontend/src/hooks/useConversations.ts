@@ -17,7 +17,7 @@ export function useConversations() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/conversations/`)
+      const res = await fetch(`${API}/api/conversations/`, { credentials: 'include' })
       setConversations(await res.json())
     } catch (e) {
       console.error(e)
@@ -33,18 +33,18 @@ export function useConversations() {
   }, [refresh])
 
   const cancelConversation = useCallback(async (id: string) => {
-    await fetch(`${API}/api/conversations/${id}/cancel`, { method: 'PATCH' })
+    await fetch(`${API}/api/conversations/${id}/cancel`, { method: 'PATCH', credentials: 'include' })
     refresh()
   }, [refresh])
 
   const deleteConversation = useCallback(async (id: string) => {
-    await fetch(`${API}/api/conversations/${id}`, { method: 'DELETE' })
+    await fetch(`${API}/api/conversations/${id}`, { method: 'DELETE', credentials: 'include' })
     refresh()
   }, [refresh])
 
   const getConversation = useCallback(async (id: string): Promise<Conversation | null> => {
     try {
-      const res = await fetch(`${API}/api/conversations/${id}`)
+      const res = await fetch(`${API}/api/conversations/${id}`, { credentials: 'include' })
       return await res.json()
     } catch { return null }
   }, [])

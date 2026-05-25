@@ -5,12 +5,13 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 from app.db.database import get_db
 from app.db.models import Conversation
+from app.api.session import get_session_id
 
 router = APIRouter()
 
 @router.get("/")
-async def list_conversations(db:AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Conversation).order_by(Conversation.updated_at.desc()))
+async def list_conversations(db:AsyncSession = Depends(get_db), session_id: str = Depends(get_session_id)):
+    result = await db.execute(select(Conversation).where(Conversation.session_id == session_id).order_by(Conversation.updated_at.desc()))
     conversations = result.scalars().all()
     return conversations
 

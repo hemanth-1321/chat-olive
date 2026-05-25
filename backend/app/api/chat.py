@@ -10,6 +10,7 @@ from sqlalchemy import select, update
 from app.db.database import get_db
 from app.db.models import Conversation, Message
 from app.sdk.llm_sdk import LLMWrapper
+from app.api.session import get_session_id
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ router=APIRouter()
 sdk=LLMWrapper()
 
 @router.post("/send")
-async def send_message(request:Request,db:AsyncSession=Depends(get_db)):
+async def send_message(request:Request,db:AsyncSession=Depends(get_db), session_id: str = Depends(get_session_id)):
     body=await request.json()
     message_text=body["message"]
     model=body["model"]
@@ -25,7 +26,7 @@ async def send_message(request:Request,db:AsyncSession=Depends(get_db)):
     provider = "Groq"
 
     if not conversation_id:
-        conv=Conversation(title=message_text[:50],model=model, provider=provider)
+        conv=Conversation(title=message_text[:50],model=model, provider=provider, session_id=session_id)
         db.add(conv)
         await db.commit()
         await db.refresh(conv)

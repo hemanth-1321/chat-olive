@@ -13,6 +13,7 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[str | None] = mapped_column(Text, index=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     model: Mapped[str] = mapped_column(Text, nullable=False)
     provider: Mapped[str] = mapped_column(Text, nullable=False)
