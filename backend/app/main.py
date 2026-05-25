@@ -2,7 +2,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import chat, conversation, logs, metrics
-from app.lib.pricing import MODELS
+from app.config import settings
+from app.lib.pricing import fetch_groq_models
 
 @asynccontextmanager
 async def lifespan(app:FastAPI):
@@ -25,5 +26,5 @@ app.include_router(logs.router, prefix="/api/logs", tags=["logs"])
 
 @app.get("/api/models")
 async def list_models():
-    return [{"id": k, "provider": v.provider} for k, v in MODELS.items()]
+    return await fetch_groq_models(settings.groq_api_key)
   

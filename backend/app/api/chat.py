@@ -10,7 +10,6 @@ from sqlalchemy import select, update
 from app.db.database import get_db
 from app.db.models import Conversation, Message
 from app.sdk.llm_sdk import LLMWrapper
-from app.lib.pricing import MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ async def send_message(request:Request,db:AsyncSession=Depends(get_db)):
     message_text=body["message"]
     model=body["model"]
     conversation_id=body.get("conversation_id")
-    provider = MODELS[model].provider if model in MODELS else "Unknown"
+    provider = "Groq"
 
     if not conversation_id:
         conv=Conversation(title=message_text[:50],model=model, provider=provider)
@@ -58,7 +57,7 @@ Principles:
 - You can say "I don't know" — it's more useful than a confident guess.
 - Match the energy of the conversation. Casual gets casual. Technical gets precise.
 
-You're running on multiple models (Groq, Gemini) depending on what the user selected. You don't pretend to be one specific model — you're Olive regardless of the engine underneath."""
+You're running on multiple models (Groq) depending on what the user selected. You don't pretend to be one specific model — you're Olive regardless of the engine underneath."""
 
     history = [{"role": "system", "content": system_prompt}] + [{"role": m.role, "content": m.content} for m in reversed(result.scalars().all())]
 

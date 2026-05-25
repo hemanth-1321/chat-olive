@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, StopCircle } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
 import { Button } from '@/components/ui/button'
 import { ModelPicker } from './ModelPicker'
+import { StreamingMessage } from './StreamingMessage'
 import { useChat, type Message } from '@/hooks/useChat'
 
 interface ChatWindowProps {
@@ -50,12 +50,10 @@ export function ChatWindow({ conversationId, initialMessages, onConversationCrea
                   m.isError ? (
                     <span>{m.content}</span>
                   ) : (
-                    <div className="prose prose-sm prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                      <ReactMarkdown>{m.content}</ReactMarkdown>
-                      {isStreaming && m === messages.at(-1) && (
-                        <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse ml-1" />
-                      )}
-                    </div>
+                    <StreamingMessage
+                      content={m.content}
+                      isStreaming={isStreaming && m === messages.at(-1)}
+                    />
                   )
                 ) : (
                   <span className="whitespace-pre-wrap">{m.content}</span>

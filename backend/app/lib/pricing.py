@@ -1,54 +1,57 @@
-from dataclasses import dataclass
+import time
+import httpx
+
+GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+EXCLUDE_PREFIXES = ("whisper", "orpheus", "canopy", "distil-whisper")
+EXCLUDE_CONTAINS = ("prompt-guard", "safeguard")
+
+# Cached pricing from LiteLLM
+_pricing_cache: dict[str, dict] = {}
+_pricing_fetched_at: float = 0
+_CACHE_TTL = 86400  # 24h
 
 
-@dataclass
-class ModelConfig:
-    provider: str
-    base_url: str
-    api_key_name: str
-    prompt_cost_per_m: float = 0.0
-    completion_cost_per_m: float = 0.0
+async def fetch_pricing() -> dict[str, dict]:
+    global _pricing_cache, _pricing_fetched_at
+    if _pricing_cache and (time.time() - _pricing_fetched_at) < _CACHE_TTL:
+        return _pricing_cache
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+            )
+            data = resp.json()
+        _pricing_cache = data
+        _pricing_fetched_at = time.time()
+    except Exception:
+        pass
+    return _pricing_cache
 
 
-MODELS: dict[str, ModelConfig] = {
-    # Groq
-    "llama-3.3-70b-versatile": ModelConfig(
-        provider="Groq",
-        base_url="https://api.groq.com/openai/v1/chat/completions",
-        api_key_name="groq_api_key",
-        prompt_cost_per_m=0.59,
-        completion_cost_per_m=0.79,
-    ),
-    "llama-3.1-8b-instant": ModelConfig(
-        provider="Groq",
-        base_url="https://api.groq.com/openai/v1/chat/completions",
-        api_key_name="groq_api_key",
-        prompt_cost_per_m=0.05,
-        completion_cost_per_m=0.08,
-    ),
-    "meta-llama/llama-4-scout-17b-16e-instruct": ModelConfig(
-        provider="Groq",
-        base_url="https://api.groq.com/openai/v1/chat/completions",
-        api_key_name="groq_api_key",
-        prompt_cost_per_m=0.11,
-        completion_cost_per_m=0.34,
-    ),
-    # Gemini
-    "gemini-2.0-flash": ModelConfig(
-        provider="Google",
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        api_key_name="gemini_api_key",
-    ),
-    "gemini-2.5-flash-preview-05-20": ModelConfig(
-        provider="Google",
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        api_key_name="gemini_api_key",
-    ),
-}
+async def get_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
+    pricing = await fetch_pricing()
+    # LiteLLM keys use "groq/" prefix
+    key = f"groq/{model}" if not model.startswith("groq/") else model
+    info = pricing.get(key) or pricing.get(model, {})
+    input_cost = info.get("input_cost_per_token", 0) or 0
+    output_cost = info.get("output_cost_per_token", 0) or 0
+    return prompt_tokens * input_cost + completion_tokens * output_cost
 
 
-def get_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
-    cfg = MODELS.get(model)
-    if not cfg:
-        return 0.0
-    return (prompt_tokens * cfg.prompt_cost_per_m + completion_tokens * cfg.completion_cost_per_m) / 1_000_000
+async def fetch_groq_models(api_key: str) -> list[dict]:
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                "https://api.groq.com/openai/v1/models",
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+            data = resp.json()
+        return [
+            {"id": m["id"], "provider": "Groq"}
+            for m in data.get("data", [])
+            if not any(m["id"].startswith(p) for p in EXCLUDE_PREFIXES)
+            and not any(s in m["id"] for s in EXCLUDE_CONTAINS)
+        ]
+    except Exception:
+        return []
