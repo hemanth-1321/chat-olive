@@ -6,7 +6,9 @@ import { Sidebar } from '@/components/Sidebar'
 import { ChatWindow } from '@/components/ChatWindow'
 import { Dashboard } from '@/components/Dashboard'
 import { LogsTable } from '@/components/LogsTable'
+import { OnboardingDialog } from '@/components/OnboardingDialog'
 import { useConversations } from '@/hooks/useConversations'
+import { getUsername } from '@/lib/session'
 import type { Message } from '@/hooks/useChat'
 
 export default function App() {
@@ -14,6 +16,7 @@ export default function App() {
   const [dark, setDark] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [initialMessages, setInitialMessages] = useState<Message[]>([])
+  const [onboarded, setOnboarded] = useState(() => !!getUsername())
   const { conversations, refresh, cancelConversation, deleteConversation, getConversation } = useConversations()
 
   useEffect(() => {
@@ -37,6 +40,7 @@ export default function App() {
 
   return (
     <div className="h-screen flex bg-background text-foreground overflow-hidden">
+      <OnboardingDialog open={!onboarded} onComplete={() => setOnboarded(true)} />
       <Sidebar
         conversations={conversations}
         selectedId={selectedId}

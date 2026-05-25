@@ -231,7 +231,7 @@ erDiagram
 
 ### Design Decisions
 
-- **`session_id` on conversations** — header-based anonymous isolation; each browser stores a UUID in localStorage and sends it via `x-session-id` header, so each user only sees their own conversations
+- **`session_id` on conversations** — header-based anonymous isolation; each browser stores a username in localStorage and sends it via `x-session-id` header as `username@olive`, so each user only sees their own conversations
 - **`inference_logs.message_id` uses `ON DELETE SET NULL`** — logs persist even if conversation is deleted (audit trail)
 - **`total_tokens` denormalized on conversations** — avoids expensive SUM queries for dashboard
 - **PII redaction on previews only** — full message content stored unredacted in `messages` table for conversation continuity
