@@ -18,7 +18,7 @@ async def list_logs(
       db: AsyncSession = Depends(get_db),
       session_id: str = Depends(get_session_id),
   ):
-      query = select(InferenceLog).join(Conversation, InferenceLog.conversation_id == Conversation.id).order_by(InferenceLog.timestamp.desc())
+      query = select(InferenceLog).outerjoin(Conversation, InferenceLog.conversation_id == Conversation.id).order_by(InferenceLog.timestamp.desc())
       if session_id:
           query = query.where(Conversation.session_id == session_id)
       if model:

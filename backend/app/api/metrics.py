@@ -22,7 +22,7 @@ async def overview(db: AsyncSession = Depends(get_db), session_id: str = Depends
               func.avg(InferenceLog.ttft_ms).label("avg_ttft_ms"),
               func.sum(InferenceLog.total_tokens).label("total_tokens"),
               func.sum(InferenceLog.estimated_cost_usd).label("total_cost_usd"),
-          ).join(Conversation, InferenceLog.conversation_id == Conversation.id)
+          ).outerjoin(Conversation, InferenceLog.conversation_id == Conversation.id)
       if session_id:
           query = query.where(Conversation.session_id == session_id)
       result = await db.execute(query)
@@ -50,7 +50,7 @@ async def throughput(db: AsyncSession = Depends(get_db), session_id: str = Depen
             minute.label("minute"),
             func.count(InferenceLog.id).label("requests"),
             func.coalesce(func.sum(InferenceLog.total_tokens), 0).label("tokens"),
-        ).join(Conversation, InferenceLog.conversation_id == Conversation.id).where(InferenceLog.timestamp >= since)
+        ).outerjoin(Conversation, InferenceLog.conversation_id == Conversation.id).where(InferenceLog.timestamp >= since)
     if session_id:
         query = query.where(Conversation.session_id == session_id)
     result = await db.execute(query.group_by(minute).order_by(minute))

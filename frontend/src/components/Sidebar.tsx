@@ -1,10 +1,11 @@
-import { Plus, X, Square } from 'lucide-react'
+import { Plus, X, Square, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { Conversation } from '@/hooks/useConversations'
 
 interface SidebarProps {
   conversations: Conversation[]
+  loading?: boolean
   selectedId: string | null
   onSelect: (id: string) => void
   onNew: () => void
@@ -14,7 +15,7 @@ interface SidebarProps {
   onClose: () => void
 }
 
-export function Sidebar({ conversations, selectedId, onSelect, onNew, onCancel, onDelete, open, onClose }: SidebarProps) {
+export function Sidebar({ conversations, loading, selectedId, onSelect, onNew, onCancel, onDelete, open, onClose }: SidebarProps) {
   return (
     <>
       {open && <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />}
@@ -28,7 +29,13 @@ export function Sidebar({ conversations, selectedId, onSelect, onNew, onCancel, 
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="p-2 space-y-1">
-            {conversations.map(c => (
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : conversations.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-8">No conversations yet</p>
+            ) : conversations.map(c => (
               <div
                 key={c.id}
                 onClick={() => onSelect(c.id)}

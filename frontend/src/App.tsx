@@ -8,8 +8,8 @@ import { Dashboard } from '@/components/Dashboard'
 import { LogsTable } from '@/components/LogsTable'
 import { OnboardingDialog } from '@/components/OnboardingDialog'
 import { useConversations } from '@/hooks/useConversations'
+import { useAppStore } from '@/store'
 import { getUsername } from '@/lib/session'
-import type { Message } from '@/hooks/useChat'
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -17,10 +17,9 @@ export default function App() {
     const saved = localStorage.getItem('ollive_theme')
     return saved ? saved === 'dark' : true
   })
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [initialMessages, setInitialMessages] = useState<Message[]>([])
   const [onboarded, setOnboarded] = useState(() => !!getUsername())
-  const { conversations, refresh, cancelConversation, deleteConversation, getConversation } = useConversations()
+  const { selectedId, initialMessages, setSelectedId, setInitialMessages } = useAppStore()
+  const { conversations, loading: convLoading, refresh, cancelConversation, deleteConversation, getConversation } = useConversations()
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -32,7 +31,7 @@ export default function App() {
     setSidebarOpen(false)
     const conv = await getConversation(id)
     if (conv?.messages) {
-      setInitialMessages(conv.messages.map((m, i) => ({ id: String(i), role: m.role as 'user' | 'assistant', content: m.content })))
+      setInitialMessages(conv.messages.map((m: { role: string; content: string }, i: number) => ({ id: String(i), role: m.role as 'user' | 'assistant', content: m.content })))
     }
   }
 
@@ -47,6 +46,7 @@ export default function App() {
       <OnboardingDialog open={!onboarded} onComplete={() => setOnboarded(true)} />
       <Sidebar
         conversations={conversations}
+        loading={convLoading}
         selectedId={selectedId}
         onSelect={handleSelect}
         onNew={handleNew}

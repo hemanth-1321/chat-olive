@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Loader2 } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +20,7 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export function LogsTable() {
   const [logs, setLogs] = useState<LogEntry[]>([])
+  const [loading, setLoading] = useState(true)
   const [model, setModel] = useState('')
   const [status, setStatus] = useState('')
 
@@ -29,7 +31,7 @@ export function LogsTable() {
     try {
       const res = await fetch(`${API}/api/logs/?${params}`, { headers: { 'x-session-id': getSessionId() } })
       setLogs(await res.json())
-    } catch (e) { console.error(e) }
+    } catch (e) { console.error(e) } finally { setLoading(false) }
   }, [model, status])
 
   useEffect(() => {
@@ -37,6 +39,8 @@ export function LogsTable() {
       await fetchLogs()
     })()
   }, [fetchLogs])
+
+  if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
 
   return (
     <div className="p-6 space-y-4 max-w-6xl mx-auto">

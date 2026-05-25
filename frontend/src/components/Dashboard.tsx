@@ -1,10 +1,11 @@
+import { Loader2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useMetrics } from '@/hooks/useMetrics'
 
 export function Dashboard() {
   const { overview, throughput, loading } = useMetrics()
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading metrics...</div>
+  if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
   if (!overview) return <div className="p-8 text-muted-foreground">No data available</div>
 
   const cards = [
