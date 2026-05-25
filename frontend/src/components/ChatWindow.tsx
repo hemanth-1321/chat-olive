@@ -16,6 +16,14 @@ export function ChatWindow({ conversationId, initialMessages, onConversationCrea
   const [input, setInput] = useState('')
   const [model, setModel] = useState('llama-3.3-70b-versatile')
   const messagesViewportRef = useRef<HTMLDivElement>(null)
+  const wasStreamingRef = useRef(false)
+
+  useEffect(() => {
+    if (wasStreamingRef.current && !isStreaming) {
+      onConversationCreated?.()
+    }
+    wasStreamingRef.current = isStreaming
+  }, [isStreaming, onConversationCreated])
 
   useEffect(() => {
     reset(initialMessages || [], conversationId)
@@ -31,7 +39,6 @@ export function ChatWindow({ conversationId, initialMessages, onConversationCrea
     if (!input.trim() || isStreaming) return
     sendMessage(input.trim(), model)
     setInput('')
-    onConversationCreated?.()
   }
 
   return (

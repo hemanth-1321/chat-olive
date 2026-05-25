@@ -18,7 +18,7 @@ export default function App() {
     return saved ? saved === 'dark' : true
   })
   const [onboarded, setOnboarded] = useState(() => !!getUsername())
-  const { selectedId, initialMessages, setSelectedId, setInitialMessages } = useAppStore()
+  const { selectedId, initialMessages, activeTab, setSelectedId, setInitialMessages, setActiveTab } = useAppStore()
   const { conversations, loading: convLoading, refresh, cancelConversation, deleteConversation, getConversation } = useConversations()
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
       />
       <main className="flex-1 flex h-screen min-h-0 min-w-0 flex-col overflow-hidden">
-        <Tabs defaultValue="chat" className="flex-1 flex min-h-0 flex-col overflow-hidden">
+        <Tabs defaultValue="chat" className="flex-1 flex min-h-0 flex-col overflow-hidden" onValueChange={(v) => setActiveTab(v)}>
           <div className="shrink-0 h-[57px] border-b border-border px-4 flex items-center gap-4">
             <Button size="icon" variant="ghost" className="md:hidden" onClick={() => setSidebarOpen(true)}>
               <Menu className="w-5 h-5" />
@@ -72,9 +72,9 @@ export default function App() {
               </Button>
             </div>
           </div>
-          <TabsContent value="chat" className="flex-1 min-h-0 m-0 overflow-hidden">
+          <div className={`flex-1 min-h-0 overflow-hidden ${activeTab !== 'chat' ? 'hidden' : ''}`}>
             <ChatWindow conversationId={selectedId} initialMessages={initialMessages} onConversationCreated={refresh} />
-          </TabsContent>
+          </div>
           <TabsContent value="dashboard" className="flex-1 m-0 overflow-auto">
             <Dashboard />
           </TabsContent>

@@ -97,11 +97,10 @@ You're running on multiple models (Groq) depending on what the user selected. Yo
                 else:
                     full_response.append(chunk)
                     yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            await save_message()
         except Exception as e:
             logger.error("Stream exception for conversation=%s: %s", conversation_id, str(e))
             yield f"data: {json.dumps({'error': 'Something went wrong. Please try again later.'})}\n\n"
-        finally:
-            await save_message()
         yield f"data: {json.dumps({'done': True, 'conversation_id': conversation_id, 'message_id': assistant_message_id})}\n\n"
   
     return StreamingResponse(event_stream(), media_type="text/event-stream")
