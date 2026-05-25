@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getSessionId } from '@/lib/session'
 
 export interface MetricsOverview {
   total_requests: number
@@ -29,8 +30,8 @@ export function useMetrics() {
     const fetchAll = async () => {
       try {
         const [ov, tp] = await Promise.all([
-          fetch(`${API}/api/metrics/overview`).then(r => r.json()),
-          fetch(`${API}/api/metrics/throughput`).then(r => r.json()),
+          fetch(`${API}/api/metrics/overview`, { headers: { 'x-session-id': getSessionId() } }).then(r => r.json()),
+          fetch(`${API}/api/metrics/throughput`, { headers: { 'x-session-id': getSessionId() } }).then(r => r.json()),
         ])
         setOverview(ov)
         setThroughput(tp)

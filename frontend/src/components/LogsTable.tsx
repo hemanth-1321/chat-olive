@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { getSessionId } from '@/lib/session'
 
 interface LogEntry {
   id: string
@@ -26,7 +27,7 @@ export function LogsTable() {
     if (model) params.set('model', model)
     if (status) params.set('status', status)
     try {
-      const res = await fetch(`${API}/api/logs/?${params}`)
+      const res = await fetch(`${API}/api/logs/?${params}`, { headers: { 'x-session-id': getSessionId() } })
       setLogs(await res.json())
     } catch (e) { console.error(e) }
   }, [model, status])
